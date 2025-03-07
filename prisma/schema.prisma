@@ -1,0 +1,109 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "mongodb"
+  url      = env("MONGODB_URL")
+}
+
+enum UserRole {
+  ADMIN
+  USER
+}
+
+enum Status {
+  ON_TIME
+  DELAY
+  DELIVERED
+}
+
+model User {
+  id            String           @id @default(auto()) @map("_id") @db.ObjectId
+  name          String?
+  email         String?          @unique
+  emailVerified DateTime?
+  image         String?
+  password      String?
+  role          UserRole         @default(USER)
+  accounts      Account[]
+  apps          AppIntegration[]
+  workflows     Workflow[]
+  orders        Order[]
+  createdAt     DateTime         @default(now())
+  updatedAt     DateTime         @updatedAt
+}
+
+model Account {
+  id                String   @id @default(auto()) @map("_id") @db.ObjectId
+  userId            String   @db.ObjectId
+  type              String
+  provider          String
+  providerAccountId String
+  refresh_token     String?  @db.String
+  access_token      String?  @db.String
+  expires_at        Int?
+  token_type        String?
+  scope             String?
+  id_token          String?  @db.String
+  session_state     String?
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+  user              User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([provider, providerAccountId])
+}
+
+model AppIntegration {
+  id           String   @id @default(auto()) @map("_id") @db.ObjectId
+  appName      String // e.g., "Google Drive", "Slack"
+  accessToken  String
+  refreshToken String?
+  channelId    String?
+  guildId      String?
+  webhookURL   String?
+  userId       String   @db.ObjectId
+  user         User     @relation(fields: [userId], references: [id])
+  expiresAt    DateTime
+  scopes       String[]
+  connectedAt  DateTime @default(now())
+
+  @@unique([userId, appName]) // Unique compound index
+}
+
+model Workflow {
+  id          String   @id @default(auto()) @map("_id") @db.ObjectId
+  userId      String   @db.ObjectId
+  user        User     @relation(fields: [userId], references: [id])
+  name        String
+  isPublished Boolean? @default(false)
+  data        Steps?   @relation("WorkflowSteps")
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+}
+
+model Steps {
+  id         String   @id @default(auto()) @map("_id") @db.ObjectId
+  workflowId String   @db.ObjectId
+  workflow   Workflow @relation("WorkflowSteps", fields: [workflowId], references: [id], onDelete: Cascade)
+  flow       String
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  @@unique([workflowId])
+}
+
+model Order {
+  id           String   @id @default(auto()) @map("_id") @db.ObjectId
+  userId       String   @db.ObjectId
+  user         User     @relation(fields: [userId], references: [id])
+  type         String
+  parameters   String
+  price        String
+  status       String?
+  deliveryDate DateTime
+  sender       Json
+  receiver     Json
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+}
